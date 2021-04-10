@@ -1,0 +1,78 @@
+import jk.http.client
+import jk.http.worker
+
+class is HTTPRPCRouter #webapi2:
+
+model UserRequest
+{
+    id as int
+    firstname as string
+    lastname as string
+    username as string
+    password as string
+    phonenumber as int
+    Gender as string
+    position as string
+    subject as string
+
+}
+
+var db as FacultyDatabase
+var cors = FacultyConfig.getCorsUtil()
+
+func getDatabase as FacultyDatabase
+{
+    if not db {
+        db = FacultyDatabase.forContext(getCtx())
+        db.updateTables()
+    }
+
+    return db
+}
+
+func postProcess(req as HTTPWorkerRequest, resp as HTTPWorkerResponse) override:
+cors.handleWorkerRequest(req, resp)
+
+GET "/user"
+{
+    var user = assert getDatabase().getUser()
+    sendOk user
+}
+
+POST "/user"
+{
+    var requestData = assert UserRequest.forJsonString(req.getBodyString()):
+    sendError "invalidRequest"
+    var user = new FacultyDatabase.User()
+    user.setFirstname(requestData.getFirstname())
+    user.setLastname(requestData.getLastname())
+    user.setUsername(requestData.getUsername())
+    user.setPassword(requestData.getPassword())
+    user.setPhonenumber(requestData.getPhonenumber())
+    user.setGender(requestData.getGender())
+    user.setPosition(requestData.getPosition())
+    user.setSubject(requestData.getSubject())
+ 
+    assert getDatabase().addUser(user):
+    sendError "failedToSaveUser"
+    sendOk
+}
+
+ PUT "/user"
+{
+    var requestData = assert UserRequest.forJsonString(req.getBodyString()):
+        sendError "invalidRequest"
+    var user = new FacultyDatabase.User()
+    user.setUsername(requestData.getUsername())
+    user.setPassword(requestData.getPassword())
+    assert getDatabase().updateUser(vars.getString("id"), user):
+        sendError "failedToUpdateUser"
+    sendOk
+}
+
+DELETE "/user"
+{
+    assert getDatabase().deleteUser(vars.getString("id")):
+        sendError "failedToDeleteUser"
+    sendOk
+}

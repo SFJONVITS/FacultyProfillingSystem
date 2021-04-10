@@ -1,0 +1,159 @@
+import jk.log
+import jk.sqlite
+import jk.mysql
+import jk.sql
+import jk.env
+import jk.time
+
+class:
+
+model User
+{
+    id as int
+    firstname as string
+    lastname as string
+    username as string
+    password as string
+    phonenumber as int
+    Gender as string
+    position as string
+    subject as string
+
+
+}
+
+model Register 
+{
+    id as string
+    username as string
+    password as string
+    firstName as string
+    lastName as string
+
+
+}
+
+
+
+
+const USER = "User"     //for user table
+const REGISTER = "Register"  // for register table
+
+pvar db as MySQLDatabase
+
+func forContext(ctx as LoggingContext) static as this
+{
+    var cstr = EnvironmentVariable.get("TASK_DATABASE")
+    Log.debug(ctx, "Opening database connection: '" .. cstr .. "'")
+    db = MySQLDatabase.forConnectionStringSync(ctx, cstr)
+    if not db:
+        Error.throw("failedToConnectToDatabase", cstr)
+    var v = new this()
+    v.setDb(db)
+    return v
+}
+
+func updateTable(table as SQLTableInfo)
+{
+    if not table:
+        Error.throw("nullTabel", "updateTable")
+    if not db:
+        Error.throw("nullTable", "updateTable")
+    if not db.ensureTableExistsSync(table):
+        Error.throw("failedToUpdateTable", table.getName())
+}
+
+func updateTables
+{
+    var user = SQLTableInfo.forName(USER)
+    user.addIntegerKeyColumn("id")
+    user.addStringColumn("firstname")
+    user.addStringColumn("lastname")
+    user.addStringColumn("username")
+    user.addStringColumn("password")
+    user.addIntegerColumn("phonenumber")
+    user.addIntegerColumn("Gender")
+    user.addIntegerColumn("position")
+    user.addIntegerColumn("subject")
+
+    updateTable(user)
+
+
+}
+
+func addUser(user as User) as User
+{
+    assert user
+    assert db.executeSync(db.prepareInsertStatementSync(USER, user.toDynamicMap()))
+    return user
+}
+
+func addRegister(register as Register) as Register
+{
+    assert register
+    assert db.executeSync(db.prepareInsertStatementSync(REGISTER, register.toDynamicMap()))
+    return register
+}
+
+func updateUser(id as string, user as User) as bool
+{
+    assert user
+    var criteria = new User()
+    return db.executeSync(db.prepareUpdateStatementSync(USER, criteria.toDynamicMap(), user.toDynamicMap()))
+
+}
+
+func deleteUser(id as string) as bool
+{
+    var criteria = new User()
+    return db.executeSync(db.prepareDeleteStatementSync(USER, criteria.toDynamicMap()))
+}
+
+func getUser as DynamicMap
+{
+    var v = new vector<User>
+    var it = assert db.querySync(db.prepareQueryAllStatementSync(USER)):
+        return null
+    while it {
+        var o = it.next()
+        if not o:
+            break
+        var user = User.forJsonObject(o)
+        if not user:
+            continue
+        v += user
+    }
+    var data = new DynamicMap()
+    data.setObject("records", v)
+    return data
+
+}
+
+func getAdmin as DynamicMap
+{
+    var v = new vector<Register>
+    var it = assert db.querySync(db.prepareQueryAllStatementSync(REGISTER)):
+        return null
+    while it {
+        var o = it.next()
+        if not o:
+            break
+        var register = Register.forJsonObject(o)
+        if not register:
+            continue
+        v += register
+    }
+    var data = new DynamicMap()
+   data.setObject("records", v)
+    return data
+}
+
+
+
+
+func close
+{
+    if db:
+        db.closeSync()
+    db = null
+}
